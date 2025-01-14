@@ -13,13 +13,14 @@ namespace OnnxExt
     {
         const int InputWidth = 160;
         const int InputHeight = 160;
-        const float Confidence = 0.9F;
+        const float Confidence = 0.45F;
+        const float Nms = 0.45F;
 
         static void Main(string[] args)
         {
             // 文件路径
             string modelPath = "./assets/best0113.onnx";
-            string imagePath = "./assets/24-5-16_08.27.44_78.png";
+            string imagePath = "./assets/24-5-16_08.27.44_782.png";
 
             // 创建InferenceSession对象
             using (var session = new InferenceSession(modelPath))
@@ -60,7 +61,10 @@ namespace OnnxExt
                     if (outputTensor != null)
                     {
                         List<ObjectResult> objectResults =  ProcessOutput(outputTensor, imagePath);
-                        DrawBoundingBoxes(objectResults, imagePath);
+
+                        List<ObjectResult> objectResultsNms = NonMaxSuppression(objectResults, Nms);
+
+                        DrawBoundingBoxes(objectResultsNms, imagePath);
                     }
                     else
                     {
@@ -181,17 +185,17 @@ namespace OnnxExt
                         var pen = new Pen(Color.Red, 1); // 设置画笔颜色和宽度
                         foreach (var result in objectResults)
                         {
-                            // 将坐标转换为图像上的实际坐标
-                            float xMin = (result.X - result.W / 2) * image.Width / InputWidth;
-                            float yMin = (result.Y - result.H / 2) * image.Height / InputHeight;
+                            // 输出坐标转换为原图坐标
+                            float leftTopX = (result.X - result.W / 2) / InputWidth * image.Width;
+                            float leftTopY = (result.Y - result.H / 2) / InputHeight * image.Height;
                             float width = result.W * image.Width / InputWidth;
                             float height = result.H * image.Height / InputHeight;
 
                             // 绘制矩形框
-                            graphics.DrawRectangle(pen, xMin, yMin, width, height);
+                            graphics.DrawRectangle(pen, leftTopX, leftTopY, width, height);
 
-                            // 绘制标签 (这里简化为只显示置信度)
-                            graphics.DrawString($"{result.Confidence:F3}", SystemFonts.DefaultFont, Brushes.Red, xMin, yMin);
+                            // 绘制文本
+                            graphics.DrawString($"{result.Confidence:F3}", SystemFonts.DefaultFont, Brushes.Red, leftTopX, leftTopY);
                         }
                     }
 
@@ -201,6 +205,59 @@ namespace OnnxExt
                     Console.WriteLine($"渲染图像已保存至: {outputImagePath}");
                 }
             }
+        }
+
+        // 计算IoU
+        static float CalculateIoU(ObjectResult boxA, ObjectResult boxB)
+        {
+            // 左上角坐标
+            float xA1 = boxA.X - boxA.W / 2;
+            float yA1 = boxA.Y - boxA.H / 2;
+            float xA2 = boxA.X + boxA.W / 2;
+            float yA2 = boxA.Y + boxA.H / 2;
+            // 右下角坐标
+            float xB1 = boxB.X - boxB.W / 2;
+            float yB1 = boxB.Y - boxB.H / 2;
+            float xB2 = boxB.X + boxB.W / 2;
+            float yB2 = boxB.Y + boxB.H / 2;
+
+            // 相交部分的坐标
+            float xI1 = Math.Max(xA1, xB1);
+            float yI1 = Math.Max(yA1, yB1);
+            float xI2 = Math.Min(xA2, xB2);
+            float yI2 = Math.Min(yA2, yB2);
+
+            // 计算交集面积
+            float interArea = Math.Max(0, xI2 - xI1) * Math.Max(0, yI2 - yI1);
+            // 计算并集面积
+            float boxAArea = boxA.W * boxA.H;
+            float boxBArea = boxB.W * boxB.H;
+            float unionArea = boxAArea + boxBArea - interArea;
+
+            // 计算 IoU
+            return interArea / unionArea;
+        }
+
+        // 非极大值抑制（NMS)
+        static List<ObjectResult> NonMaxSuppression(List<ObjectResult> boxes, float iouThreshold)
+        {
+            // 根据置信度对框进行降序排序
+            boxes.Sort((a, b) => b.Confidence.CompareTo(a.Confidence));
+
+            List<ObjectResult> selectedBoxes = new List<ObjectResult>();
+
+            while (boxes.Count > 0)
+            {
+                // 选择当前置信度最高的框
+                ObjectResult currentBox = boxes[0];
+                selectedBoxes.Add(currentBox);
+                boxes.RemoveAt(0);
+
+                // 遍历剩余的框，如果与当前框的 IoU 大于阈值，则移除
+                boxes = boxes.Where(box => CalculateIoU(currentBox, box) <= iouThreshold).ToList();
+            }
+
+            return selectedBoxes;
         }
     }
 }
