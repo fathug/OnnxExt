@@ -142,8 +142,25 @@ namespace OnnxExt
             {
                 int idxConfidence = lengthD4 * i + 4; // 每个检测结果中的置信度索引
                 float confidence = outputTensor.GetValue(idxConfidence);
+
                 if (confidence > Confidence)
                 {
+                    int maxClassId = -1;
+                    float maxClassScore = 0;
+
+                    int idxStart = idxConfidence + 1;
+                    int idxEdn = (i + 1) * lengthD4;
+
+                    for (int j = idxStart; j < idxEdn; j++)
+                    {
+                        float tmpClasaScore = outputTensor.GetValue(j);
+                        if (tmpClasaScore > maxClassScore)
+                        {
+                            maxClassScore = tmpClasaScore;
+                            maxClassId = j - idxConfidence - 1;//这里可能有问题
+                        }
+                    }
+
                     float x = outputTensor.GetValue(idxConfidence - 4);
                     float y = outputTensor.GetValue(idxConfidence - 3);
                     float w = outputTensor.GetValue(idxConfidence - 2);
@@ -155,7 +172,8 @@ namespace OnnxExt
                         X = x,
                         Y = y,
                         W = w,
-                        H = h
+                        H = h,
+                        ClassId = maxClassId,
                     };
                     objectResults.Add(tmp);
                 }
@@ -171,6 +189,7 @@ namespace OnnxExt
             public float Y { get; set; }
             public float W { get; set; }
             public float H { get; set; }
+            public int ClassId { get; set; }
         }
 
         // 结果绘制
@@ -178,13 +197,22 @@ namespace OnnxExt
         {
             if (objectResults.Count > 0)
             {
+                // 获取所有检测到的类别
+                HashSet<int> uniqueClassIds = new HashSet<int>(objectResults.Select(r => r.ClassId));
+                int numClasses = uniqueClassIds.Count;
+                // 动态生成颜色
+                Color[] classColors = GenerateDistinctColors(numClasses);
+
                 using (var image = new Bitmap(imagePath))
                 {
                     using (var graphics = Graphics.FromImage(image))
                     {
-                        var pen = new Pen(Color.Red, 1); // 设置画笔颜色和宽度
                         foreach (var result in objectResults)
                         {
+                            // 根据 ClassId 获取对应的颜色
+                            int colorIndex = uniqueClassIds.ToList().IndexOf(result.ClassId);
+                            var pen = new Pen(classColors[colorIndex % classColors.Length], 1);
+
                             // 输出坐标转换为原图坐标
                             float leftTopX = (result.X - result.W / 2) / InputWidth * image.Width;
                             float leftTopY = (result.Y - result.H / 2) / InputHeight * image.Height;
@@ -195,7 +223,7 @@ namespace OnnxExt
                             graphics.DrawRectangle(pen, leftTopX, leftTopY, width, height);
 
                             // 绘制文本
-                            graphics.DrawString($"{result.Confidence:F3}", SystemFonts.DefaultFont, Brushes.Red, leftTopX, leftTopY);
+                            graphics.DrawString($"{result.ClassId},{result.Confidence:F2}", SystemFonts.DefaultFont, Brushes.Red, leftTopX, leftTopY);
                         }
                     }
 
@@ -258,6 +286,44 @@ namespace OnnxExt
             }
 
             return selectedBoxes;
+        }
+
+        // 生成不同颜色的函数
+        static Color[] GenerateDistinctColors(int count)
+        {
+            Color[] colors = new Color[count];
+            for (int i = 0; i < count; i++)
+            {
+                // 使用 HSV 颜色空间生成颜色
+                colors[i] = ColorFromHSV(i * (360.0 / count), 0.8, 0.9);
+            }
+            return colors;
+        }
+
+        // HSV 转换为 RGB
+        static Color ColorFromHSV(double hue, double saturation, double value)
+        {
+            int hi = Convert.ToInt32(Math.Floor(hue / 60)) % 6;
+            double f = hue / 60 - Math.Floor(hue / 60);
+
+            value = value * 255;
+            int v = Convert.ToInt32(value);
+            int p = Convert.ToInt32(value * (1 - saturation));
+            int q = Convert.ToInt32(value * (1 - f * saturation));
+            int t = Convert.ToInt32(value * (1 - (1 - f) * saturation));
+
+            if (hi == 0)
+                return Color.FromArgb(255, v, t, p);
+            else if (hi == 1)
+                return Color.FromArgb(255, q, v, p);
+            else if (hi == 2)
+                return Color.FromArgb(255, p, v, t);
+            else if (hi == 3)
+                return Color.FromArgb(255, p, q, v);
+            else if (hi == 4)
+                return Color.FromArgb(255, t, p, v);
+            else
+                return Color.FromArgb(255, v, p, q);
         }
     }
 }
