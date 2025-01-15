@@ -96,25 +96,45 @@ namespace OnnxExt
                 // 将图像缩放到指定尺寸
                 Bitmap resizedImage = LetterboxResize(image, InputWidth, InputHeight);
 
-                var pixelNum = InputWidth * InputHeight;    // 总像素数
+                int pixelNum = InputWidth * InputHeight;    // 总像素数
 
-                // 将图像数据转换为浮点数组，并进行归一化和通道顺序调整
-                float[] inputData = new float[pixelNum * 3];
+                // 用LockBits加速像素访问
+                var bitmapData = resizedImage.LockBits(new Rectangle(0, 0, InputWidth, InputHeight), ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
 
-                for (int y = 0; y < InputHeight; y++)
+                try
                 {
-                    for (int x = 0; x < InputWidth; x++)
-                    {
-                        int index = ((y * InputWidth) + x);
+                    // 在堆上分配内存
+                    float[] inputData = new float[pixelNum * 3];
 
-                        Color pixel = resizedImage.GetPixel(x, y);
-                        inputData[index + pixelNum * 0] = pixel.R / 255f; // R
-                        inputData[index + pixelNum * 1] = pixel.G / 255f; // G
-                        inputData[index + pixelNum * 2] = pixel.B / 255f; // B
+                    unsafe
+                    {
+                        byte* ptr = (byte*)bitmapData.Scan0; // 获取图像数据首地址
+
+                        for (int y = 0; y < InputHeight; y++)
+                        {
+                            for (int x = 0; x < InputWidth; x++)
+                            {
+                                int index = ((y * InputWidth) + x);
+
+                                int ptrIndex = (y * bitmapData.Stride) + (x * 3);
+
+                                // 直接从内存读取并归一化，注意 BGR 顺序
+                                fixed (float* pInputData = &inputData[0])
+                                {
+                                    pInputData[index + pixelNum * 0] = ptr[ptrIndex + 2] / 255f; // R
+                                    pInputData[index + pixelNum * 1] = ptr[ptrIndex + 1] / 255f; // G
+                                    pInputData[index + pixelNum * 2] = ptr[ptrIndex + 0] / 255f; // B
+                                }
+                            }
+                        }
                     }
+                    // 转为张量，形状为[1,3,InputHeight,InputWidth]
+                    return new DenseTensor<float>(inputData, new int[] { 1, 3, InputHeight, InputWidth });
                 }
-                // 转为张量，形状为[1,3,InputHeight,InputWidth]
-                return new DenseTensor<float>(inputData, new int[] { 1, 3, InputHeight, InputWidth });
+                finally
+                {
+                    resizedImage.UnlockBits(bitmapData);
+                }
             }
         }
 
