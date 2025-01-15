@@ -6,6 +6,8 @@ using System.Linq;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace OnnxExt
 {
@@ -21,6 +23,9 @@ namespace OnnxExt
             // 文件路径
             string modelPath = "./assets/best0113.onnx";
             string imagePath = "./assets/24-5-16_08.27.44_782.png";
+
+            // 创建Stopwatch
+            Stopwatch stopwatch = new Stopwatch();
 
             // 创建InferenceSession对象
             using (var session = new InferenceSession(modelPath))
@@ -44,7 +49,10 @@ namespace OnnxExt
                 // 准备输入数据
                 string inputName = inputMeta.First().Key; // 获取第一个输入的名称
 
+                stopwatch.Start();
                 DenseTensor<float> inputTensor = PreprocessImage(imagePath);
+                stopwatch.Stop();
+                Console.WriteLine($"PreprocessImage cost {stopwatch.ElapsedMilliseconds}ms");
 
                 var inputs = new List<NamedOnnxValue>()
                 {
@@ -86,37 +94,26 @@ namespace OnnxExt
             using (var image = new Bitmap(imagePath))
             {
                 // 将图像缩放到指定尺寸
-                Bitmap resizedImage = new Bitmap(image, InputWidth, InputHeight);
+                Bitmap resizedImage = LetterboxResize(image, InputWidth, InputHeight);
+
+                var pixelNum = InputWidth * InputHeight;    // 总像素数
 
                 // 将图像数据转换为浮点数组，并进行归一化和通道顺序调整
-                float[] inputData = new float[InputWidth * InputHeight * 3];
+                float[] inputData = new float[pixelNum * 3];
 
                 for (int y = 0; y < InputHeight; y++)
                 {
                     for (int x = 0; x < InputWidth; x++)
                     {
-                        Color pixel = resizedImage.GetPixel(x, y);
-                        inputData[(y * InputWidth + x) + InputWidth * InputHeight * 0] = pixel.R / 255f; // R
-                    }
-                }
-                for (int y = 0; y < InputHeight; y++)
-                {
-                    for (int x = 0; x < InputWidth; x++)
-                    {
-                        Color pixel = resizedImage.GetPixel(x, y);
-                        inputData[(y * InputWidth + x) + InputWidth * InputHeight * 1] = pixel.G / 255f; // R
-                    }
-                }
-                for (int y = 0; y < InputHeight; y++)
-                {
-                    for (int x = 0; x < InputWidth; x++)
-                    {
-                        Color pixel = resizedImage.GetPixel(x, y);
-                        inputData[(y * InputWidth + x) + InputWidth * InputHeight * 2] = pixel.B / 255f; // R
-                    }
-                }
+                        int index = ((y * InputWidth) + x);
 
-                // 创建输入张量（形状为 [1, 3, 640, 640]）
+                        Color pixel = resizedImage.GetPixel(x, y);
+                        inputData[index + pixelNum * 0] = pixel.R / 255f; // R
+                        inputData[index + pixelNum * 1] = pixel.G / 255f; // G
+                        inputData[index + pixelNum * 2] = pixel.B / 255f; // B
+                    }
+                }
+                // 转为张量，形状为[1,3,InputHeight,InputWidth]
                 return new DenseTensor<float>(inputData, new int[] { 1, 3, InputHeight, InputWidth });
             }
         }
@@ -205,6 +202,13 @@ namespace OnnxExt
 
                 using (var image = new Bitmap(imagePath))
                 {
+                    // 获取Letterbox缩放的比例和偏移量
+                    float ratio = Math.Min((float)InputWidth / image.Width, (float)InputHeight / image.Height);
+                    int newWidth = (int)(image.Width * ratio);
+                    int newHeight = (int)(image.Height * ratio);
+                    int xOffset = (InputWidth - newWidth) / 2;
+                    int yOffset = (InputHeight - newHeight) / 2;
+
                     using (var graphics = Graphics.FromImage(image))
                     {
                         foreach (var result in objectResults)
@@ -214,16 +218,24 @@ namespace OnnxExt
                             var pen = new Pen(classColors[colorIndex % classColors.Length], 1);
 
                             // 输出坐标转换为原图坐标
-                            float leftTopX = (result.X - result.W / 2) / InputWidth * image.Width;
-                            float leftTopY = (result.Y - result.H / 2) / InputHeight * image.Height;
-                            float width = result.W * image.Width / InputWidth;
-                            float height = result.H * image.Height / InputHeight;
+
+                            // 转换到 Letterbox 图像上的坐标
+                            float x = result.X - xOffset;
+                            float y = result.Y - yOffset;
+                            float w = result.W;
+                            float h = result.H;
+
+                            // 转换到原始图像上的坐标
+                            float leftTopX = (x - w / 2) / ratio;
+                            float leftTopY = (y - h / 2) / ratio;
+                            float width = w / ratio;
+                            float height = h / ratio;
 
                             // 绘制矩形框
                             graphics.DrawRectangle(pen, leftTopX, leftTopY, width, height);
 
                             // 绘制文本
-                            graphics.DrawString($"{result.ClassId},{result.Confidence:F2}", SystemFonts.DefaultFont, Brushes.Red, leftTopX, leftTopY);
+                            graphics.DrawString($"{result.ClassId},{result.Confidence:F2}", new Font("Arial", 9), new SolidBrush(pen.Color), leftTopX, leftTopY);
                         }
                     }
 
@@ -274,15 +286,24 @@ namespace OnnxExt
 
             List<ObjectResult> selectedBoxes = new List<ObjectResult>();
 
-            while (boxes.Count > 0)
-            {
-                // 选择当前置信度最高的框
-                ObjectResult currentBox = boxes[0];
-                selectedBoxes.Add(currentBox);
-                boxes.RemoveAt(0);
+            // 获取所有检测到的类别
+            HashSet<int> uniqueClassIds = new HashSet<int>(boxes.Select(r => r.ClassId));
 
-                // 遍历剩余的框，如果与当前框的 IoU 大于阈值，则移除
-                boxes = boxes.Where(box => CalculateIoU(currentBox, box) <= iouThreshold).ToList();
+            // 对每个类别分别执行 NMS
+            foreach (int classId in uniqueClassIds)
+            {
+                List<ObjectResult> boxesOfSameClass = boxes.Where(box => box.ClassId == classId).ToList();
+
+                while (boxesOfSameClass.Count > 0)
+                {
+                    // 选择当前置信度最高的框
+                    ObjectResult currentBox = boxesOfSameClass[0];
+                    selectedBoxes.Add(currentBox);
+                    boxesOfSameClass.RemoveAt(0);
+
+                    // 遍历剩余的框，如果与当前框的 IoU 大于阈值，则移除
+                    boxesOfSameClass = boxesOfSameClass.Where(box => CalculateIoU(currentBox, box) <= iouThreshold).ToList();
+                }
             }
 
             return selectedBoxes;
@@ -324,6 +345,41 @@ namespace OnnxExt
                 return Color.FromArgb(255, t, p, v);
             else
                 return Color.FromArgb(255, v, p, q);
+        }
+
+        // Letterbox 缩放函数
+        static Bitmap LetterboxResize(Bitmap image, int targetWidth, int targetHeight)
+        {
+            int imageWidth = image.Width;
+            int imageHeight = image.Height;
+
+            // 计算缩放比例，选择较小的缩放比例
+            float ratioWidth = (float)targetWidth / imageWidth;
+            float ratioHeight = (float)targetHeight / imageHeight;
+            float ratio = Math.Min(ratioWidth, ratioHeight);
+
+            // 计算缩放后的尺寸
+            int newWidth = (int)(imageWidth * ratio);
+            int newHeight = (int)(imageHeight * ratio);
+
+            // 将原始图像缩放到新的尺寸
+            Bitmap resizedImage = new Bitmap(image, newWidth, newHeight);
+
+            // 创建一个目标尺寸的空白画布，并填充灰色 (114, 114, 114)
+            Bitmap paddedImage = new Bitmap(targetWidth, targetHeight);
+            using (var graphics = Graphics.FromImage(paddedImage))
+            {
+                graphics.Clear(Color.FromArgb(114, 114, 114));
+
+                // 计算缩放后的图像在画布上的位置，使其居中
+                int xOffset = (targetWidth - newWidth) / 2;
+                int yOffset = (targetHeight - newHeight) / 2;
+
+                // 将缩放后的图像绘制到画布上
+                graphics.DrawImage(resizedImage, xOffset, yOffset);
+            }
+
+            return paddedImage;
         }
     }
 }
