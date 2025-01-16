@@ -17,7 +17,7 @@ namespace OnnxExtBatch
         private const int DefaultInputHeight = 160;
         private const float DefaultConfidenceThreshold = 0.45f;
         private const float DefaultNmsThreshold = 0.45f;
-        private const int DefaultBatchSize = 4;
+        private const int DefaultBatchSize = 200;
 
         // 成员变量
         // private说明只能在Yolov5Detector类内部访问
@@ -448,18 +448,18 @@ namespace OnnxExtBatch
 
     class Program
     {
+        public const string ConfigDirectory = @"C:\WVsion";
+
         static void Main(string[] args)
         {
             // 文件路径
-            string modelPath = "./assets/best0116bs4.onnx";
-            List<string> imagePaths = new List<string>()
-            {
-                "./assets/1.png",
-                "./assets/2.png",
-                "./assets/3.png",
-                "./assets/4.png",
-            };
+            string modelPath = Path.Combine(ConfigDirectory,"model", "best0116bs200.onnx");
 
+            string imageDirectory = Path.Combine(ConfigDirectory, "image2");
+            // 获取图片文件夹下的所有图片文件路径
+            List<string> imagePaths = Directory.GetFiles(imageDirectory, "*.*", SearchOption.TopDirectoryOnly)
+                                             .Where(s => s.EndsWith(".png") || s.EndsWith(".jpg") || s.EndsWith(".jpeg"))
+                                             .ToList();
             // 创建 Stopwatch
             Stopwatch stopwatch = new Stopwatch();
 
