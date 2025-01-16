@@ -35,8 +35,11 @@ namespace OnnxExtBatch
             // 创建Stopwatch
             Stopwatch stopwatch = new Stopwatch();
 
+            int gpuDeviceId = 0; // The GPU device ID to execute on
+            var gpuSessionOptoins = SessionOptions.MakeSessionOptionWithCudaProvider(gpuDeviceId);
+
             // 创建InferenceSession对象
-            using (var session = new InferenceSession(modelPath))
+            using (var session = new InferenceSession(modelPath, gpuSessionOptoins))
             {
                 // 获取模型的输入和输出信息
                 var inputMeta = session.InputMetadata;

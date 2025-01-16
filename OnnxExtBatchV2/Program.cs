@@ -42,7 +42,10 @@ namespace OnnxExtBatch
                               int batchSize = DefaultBatchSize)
         {
             // 加载模型
-            _session = new InferenceSession(modelPath);
+            int gpuDeviceId = 0; // The GPU device ID to execute on
+            var gpuSessionOptoins = SessionOptions.MakeSessionOptionWithCudaProvider(gpuDeviceId);
+
+            _session = new InferenceSession(modelPath, gpuSessionOptoins);
 
             // 存储配置参数
             _inputWidth = inputWidth;
@@ -438,7 +441,7 @@ namespace OnnxExtBatch
                     }
 
                     // 保存带有检测框的图像
-                    string outputImagePath = Path.Combine(Path.GetDirectoryName(imagePath), $"{Path.GetFileNameWithoutExtension(imagePath)}_output.png");
+                    string outputImagePath = Path.Combine(Path.GetDirectoryName(imagePath), $"{Path.GetFileNameWithoutExtension(imagePath)}_output.jpg");
                     image.Save(outputImagePath, ImageFormat.Png);
                     Console.WriteLine($"渲染图像已保存至: {outputImagePath}");
                 }
@@ -458,7 +461,7 @@ namespace OnnxExtBatch
             string imageDirectory = Path.Combine(ConfigDirectory, "image2");
             // 获取图片文件夹下的所有图片文件路径
             List<string> imagePaths = Directory.GetFiles(imageDirectory, "*.*", SearchOption.TopDirectoryOnly)
-                                             .Where(s => s.EndsWith(".png") || s.EndsWith(".jpg") || s.EndsWith(".jpeg"))
+                                             .Where(s => s.EndsWith(".png"))
                                              .ToList();
             // 创建 Stopwatch
             Stopwatch stopwatch = new Stopwatch();
