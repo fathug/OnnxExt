@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnnxExt", "OnnxExt\OnnxExt.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnnxExtBatch", "OnnxExtBatch\OnnxExtBatch.csproj", "{782A77B3-EA90-4F90-85DD-EF5A3948508F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnnxExtBatchV2", "OnnxExtBatchV2\OnnxExtBatchV2.csproj", "{C5964CF2-D54B-4253-A0DA-6B57AD98406A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,6 +33,14 @@ Global
 		{782A77B3-EA90-4F90-85DD-EF5A3948508F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{782A77B3-EA90-4F90-85DD-EF5A3948508F}.Release|x64.ActiveCfg = Release|Any CPU
 		{782A77B3-EA90-4F90-85DD-EF5A3948508F}.Release|x64.Build.0 = Release|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Debug|x64.Build.0 = Debug|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Release|x64.ActiveCfg = Release|Any CPU
+		{C5964CF2-D54B-4253-A0DA-6B57AD98406A}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
