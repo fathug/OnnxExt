@@ -43,7 +43,7 @@ namespace OnnxExtBatch
         {
             // 加载模型
             int gpuDeviceId = 0; // The GPU device ID to execute on
-            var gpuSessionOptoins = SessionOptions.MakeSessionOptionWithCudaProvider(gpuDeviceId);
+            using var gpuSessionOptoins = SessionOptions.MakeSessionOptionWithCudaProvider(gpuDeviceId);
 
             _session = new InferenceSession(modelPath, gpuSessionOptoins);
 
