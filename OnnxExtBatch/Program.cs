@@ -7,17 +7,16 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace OnnxExtBatch
 {
     class Program
     {
-        const int InputWidth = 160;
-        const int InputHeight = 160;
+        static int InputWidth { get; set; }
+        static int InputHeight { get; set; }
         const float Confidence = 0.45F;
         const float Nms = 0.45F;
-        const int BatchSize = 4;
+        static int BatchSize { get; set; }
 
         static void Main(string[] args)
         {
@@ -58,9 +57,12 @@ namespace OnnxExtBatch
 
                 // 准备输入数据
                 string inputName = inputMeta.First().Key; // 获取第一个输入的名称
+                InputWidth = inputMeta.First().Value.Dimensions.ToArray()[2]; // 获取输入张量的尺寸，宽度和高度相等
+                InputHeight = inputMeta.First().Value.Dimensions.ToArray()[3];
+                BatchSize = inputMeta.First().Value.Dimensions.ToArray()[0];
 
                 stopwatch.Start();
-                DenseTensor<float> inputTensor = PreprocessImages(imagePaths, BatchSize);
+                DenseTensor<float> inputTensor = PreprocessImageBatch(imagePaths, BatchSize);
                 stopwatch.Stop();
                 Console.WriteLine($"PreprocessImage cost {stopwatch.ElapsedMilliseconds}ms");
 
@@ -78,7 +80,7 @@ namespace OnnxExtBatch
 
                     if (outputTensor != null)
                     {
-                        List<List<ObjectResult>> objectResults = ProcessOutput(outputTensor);
+                        List<List<ObjectResult>> objectResults = ProcessOutputBatch(outputTensor);
 
                         List<List<ObjectResult>> objectResultsNms = NonMaxSuppressionBatch(objectResults, Nms);
 
@@ -102,7 +104,7 @@ namespace OnnxExtBatch
         #region 数据预处理，使用bitmap
 
         // 图像预处理函数
-        static DenseTensor<float> PreprocessImages(List<string> imagePaths, int batchSize)
+        static DenseTensor<float> PreprocessImageBatch(List<string> imagePaths, int batchSize)
         {
             int pixelNum = InputWidth * InputHeight;    // 总像素数
 
@@ -167,7 +169,7 @@ namespace OnnxExtBatch
         #endregion
 
         // 处理模型输出结果的函数
-        static List<List<ObjectResult>> ProcessOutput(DenseTensor<float> outputTensor)
+        static List<List<ObjectResult>> ProcessOutputBatch(DenseTensor<float> outputTensor)
         {
             // 获取输出张量的形状
             int[] outputShape = outputTensor.Dimensions.ToArray();

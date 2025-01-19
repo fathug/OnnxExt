@@ -13,8 +13,8 @@ namespace OnnxExt
 {
     class Program
     {
-        const int InputWidth = 160;
-        const int InputHeight = 160;
+        static int InputWidth { get; set; }
+        static int InputHeight { get; set; }
         const float Confidence = 0.45F;
         const float Nms = 0.45F;
 
@@ -51,6 +51,9 @@ namespace OnnxExt
 
                 // 准备输入数据
                 string inputName = inputMeta.First().Key; // 获取第一个输入的名称
+
+                InputWidth = inputMeta.First().Value.Dimensions.ToArray()[2]; // 获取输入张量的尺寸，宽度和高度相等
+                InputHeight = inputMeta.First().Value.Dimensions.ToArray()[3];
 
                 stopwatch.Start();
                 DenseTensor<float> inputTensor = PreprocessImage(imagePath);

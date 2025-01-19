@@ -13,18 +13,15 @@ namespace OnnxExtBatch
     public class Yolov5Detector : IDisposable
     {
         // 常量定义 (配置参数)
-        private const int DefaultInputWidth = 160;
-        private const int DefaultInputHeight = 160;
         private const float DefaultConfidenceThreshold = 0.45f;
         private const float DefaultNmsThreshold = 0.45f;
-        private const int DefaultBatchSize = 200;
 
         // 成员变量
         // private说明只能在Yolov5Detector类内部访问
         // readonly说明这变量在声明的时候有值了，之后不可修改，这是为了保证关键参数不被修改，本项目中下述参数都是和模型有关，属于不可更改的重要参数
         private readonly InferenceSession _session;
-        private readonly int _inputWidth;
-        private readonly int _inputHeight;
+        private static int _inputWidth; // 输入张量的尺寸
+        private static int _inputHeight;
         private readonly float _confidenceThreshold;
         private readonly float _nmsThreshold;
         private readonly int _batchSize;
@@ -35,11 +32,8 @@ namespace OnnxExtBatch
 
         // 构造函数
         public Yolov5Detector(string modelPath,
-                              int inputWidth = DefaultInputWidth,
-                              int inputHeight = DefaultInputHeight,
                               float confidenceThreshold = DefaultConfidenceThreshold,
-                              float nmsThreshold = DefaultNmsThreshold,
-                              int batchSize = DefaultBatchSize)
+                              float nmsThreshold = DefaultNmsThreshold)
         {
             // 加载模型
             int gpuDeviceId = 0; // The GPU device ID to execute on
@@ -47,12 +41,16 @@ namespace OnnxExtBatch
 
             _session = new InferenceSession(modelPath, gpuSessionOptoins);
 
+            var inputMeta = _session.InputMetadata;
+            var outputMeta = _session.OutputMetadata;
+
+
             // 存储配置参数
-            _inputWidth = inputWidth;
-            _inputHeight = inputHeight;
+            _inputWidth = inputMeta.First().Value.Dimensions.ToArray()[2];
+            _inputHeight = inputMeta.First().Value.Dimensions.ToArray()[3];
             _confidenceThreshold = confidenceThreshold;
             _nmsThreshold = nmsThreshold;
-            _batchSize = batchSize;
+            _batchSize = inputMeta.First().Value.Dimensions.ToArray()[0];
 
             // 打印模型信息 (可选)
             PrintModelInfo();
@@ -62,7 +60,7 @@ namespace OnnxExtBatch
         public List<List<ObjectResult>> Detect(List<string> imagePaths)
         {
             // 4.1 图像预处理
-            DenseTensor<float> inputTensor = PreprocessImages(imagePaths);
+            DenseTensor<float> inputTensor = PreprocessImageBatch(imagePaths);
 
             // 4.2 执行推理
             var inputs = new List<NamedOnnxValue>()
@@ -74,7 +72,7 @@ namespace OnnxExtBatch
             {
                 // 4.3 结果后处理
                 DenseTensor<float> outputTensor = results.First().Value as DenseTensor<float>;
-                List<List<ObjectResult>> objectResults = ProcessOutput(outputTensor);
+                List<List<ObjectResult>> objectResults = ProcessOutputBatch(outputTensor);
                 List<List<ObjectResult>> objectResultsNms = NonMaxSuppressionBatch(objectResults);
 
                 return objectResultsNms;
@@ -82,7 +80,7 @@ namespace OnnxExtBatch
         }
 
         // 私有方法 - 图像预处理
-        private DenseTensor<float> PreprocessImages(List<string> imagePaths)
+        private DenseTensor<float> PreprocessImageBatch(List<string> imagePaths)
         {
             int pixelCount = _inputWidth * _inputHeight;
             float[] inputData = new float[_batchSize * pixelCount * 3];
@@ -143,7 +141,7 @@ namespace OnnxExtBatch
         }
 
         // 私有方法 - 结果解析
-        private List<List<ObjectResult>> ProcessOutput(DenseTensor<float> outputTensor)
+        private List<List<ObjectResult>> ProcessOutputBatch(DenseTensor<float> outputTensor)
         {
             // 获取输出张量的形状
             int[] outputShape = outputTensor.Dimensions.ToArray();
