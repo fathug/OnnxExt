@@ -27,7 +27,7 @@ namespace OnnxExtTest
             Stopwatch stopwatch = new Stopwatch();
 
             // 使用 using 语句确保资源被正确释放
-            using (var detector = new Yolov5Detector(modelPath, (float)0.7))
+            using (var detector = new Yolov5Detector(modelPath, (float)0.45, (float)0.45)) // 2个阈值参数有默认值，但是仍然可以指定
             {
                 stopwatch.Start();
                 List<List<ObjectResult>> results = detector.Detect(imagePaths);
