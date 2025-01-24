@@ -1,9 +1,12 @@
-﻿using Microsoft.ML.OnnxRuntime;
+﻿using AForge.Video;
+using AForge.Video.DirectShow;
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -11,12 +14,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace OnnxExtTest2
 {
     public partial class Form1 : Form
     {
+        Stopwatch stopwatch = new Stopwatch();
+
         public static string _modelPath { get; set; }
         public static string _imagePath { get; set; }
 
@@ -25,8 +29,18 @@ namespace OnnxExtTest2
 
         public const string HistoryDirectory = @"D:\WVsionData";
 
+        private FilterInfoCollection videoDevices;
+        private VideoCaptureDevice videoSource;
+
+        // 全局变量，用于复用对象
+        private SessionOptions gpuSessionOptions;
+        private InferenceSession session;
+        private string inputName;
+        private string outputName;
+
         public static int InputWidth { get; set; }
         public static int InputHeight { get; set; }
+        private Bitmap resizedBitmap = null;
 
         public Form1()
         {
@@ -43,7 +57,7 @@ namespace OnnxExtTest2
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     _modelPath = openFileDialog.FileName;
-                    textBox1.AppendText("选择模型" + _modelPath + "\r\n");
+                    textBox1.AppendText("选择模型: " + _modelPath + "\r\n");
                 }
             }
         }
@@ -58,13 +72,14 @@ namespace OnnxExtTest2
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     _imagePath = openFileDialog.FileName;
-                    textBox1.AppendText("选择图片" + _imagePath + "\r\n");
+                    textBox1.AppendText("选择图片: " + _imagePath + "\r\n");
                 }
             }
         }
 
         private async void button2_Click(object sender, EventArgs e)
         {
+            /*
             try
             {
                 // 加载图片并更新 UI（主线程操作）
@@ -131,6 +146,7 @@ namespace OnnxExtTest2
             {
                 MessageBox.Show($"错误:{ex.Message}");
             }
+            */
         }
 
         // 图像转张量
@@ -217,12 +233,12 @@ namespace OnnxExtTest2
         }
 
         // 处理模型输出结果
-        static List<ObjectResult> ProcessOutput(DenseTensor<float> outputTensor, string imagePath)
+        static List<ObjectResult> ProcessOutput(DenseTensor<float> outputTensor)
         {
             // 获取输出张量的形状
             int[] outputShape = outputTensor.Dimensions.ToArray();
 
-            Console.WriteLine($"本次输出张量形状: [{string.Join(",", outputShape)}]");
+            //Console.WriteLine($"本次输出张量形状: [{string.Join(",", outputShape)}]");
 
             //假设批次大小是 1.
             int numDetections = outputShape[1];
@@ -434,6 +450,132 @@ namespace OnnxExtTest2
                 return Color.FromArgb(255, t, p, v);
             else
                 return Color.FromArgb(255, v, p, q);
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                videoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+
+                if (videoDevices.Count == 0)
+                    throw new Exception("没有找到摄像头设备");
+
+                // 可以将摄像头设备添加到 ComboBox 中供用户选择
+                // foreach (FilterInfo device in videoDevices)
+                // {
+                //     comboBox1.Items.Add(device.Name);
+                // }
+                // comboBox1.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"错误: {ex.Message}");
+            }
+
+            if (videoSource == null || !videoSource.IsRunning)
+            {
+                videoSource = new VideoCaptureDevice(videoDevices[0].MonikerString); // 默认选择第一个摄像头
+                videoSource.NewFrame += new NewFrameEventHandler(video_NewFrame);
+                videoSource.Start();
+            }
+        }
+
+        // 摄像头每一帧图像回调
+        private async void video_NewFrame(object sender, NewFrameEventArgs eventArgs)
+        {
+            if (this.IsDisposed || pictureBox1.IsDisposed || pictureBox2.IsDisposed || textBox1.IsDisposed)
+            {
+                return; // 窗体或控件已释放，直接返回
+            }
+
+            try
+            {
+                // 将摄像头图像显示到 pictureBoxCam
+                Bitmap image0 = (Bitmap)eventArgs.Frame.Clone();
+
+                stopwatch.Restart();
+
+                Bitmap image0Copy = new Bitmap(image0);
+
+                pictureBox1.Image = image0;
+
+                List<ObjectResult> objectResultsNms = await Task.Run(() =>
+                {
+                    DenseTensor<float> inputTensor = PreprocessImage(image0Copy);
+
+                    var inputs = new List<NamedOnnxValue>()
+                    {
+                        NamedOnnxValue.CreateFromTensor(inputName, inputTensor)
+                    };
+
+                    // 推理
+                    using var results = session.Run(inputs);
+                    var outputTensor = results.FirstOrDefault(r => r.Name == outputName)?.Value as DenseTensor<float>;
+
+                    if (outputTensor == null)
+                        throw new Exception("推理结果为空");
+
+                    // 后处理
+                    List<ObjectResult> objectResults = ProcessOutput(outputTensor);
+                    List<ObjectResult> objectResultsNms0 = NonMaxSuppression(objectResults, Nms);
+                    return objectResultsNms0;
+                });
+
+                stopwatch.Stop();
+
+                this.Invoke((MethodInvoker)(() =>
+                {
+                    textBox1.AppendText($"run cost {stopwatch.ElapsedMilliseconds}ms" + "\r\n");
+                }));
+
+                var image1 = DrawBoundingBoxes(objectResultsNms, image0);
+
+                // 创建副本用于显示，否则会报错资源占用
+                Bitmap image1Copy = new Bitmap(image1);
+                pictureBox2.Image = image1Copy;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"错误:{ex.Message}");
+            }
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (videoSource != null && videoSource.IsRunning)
+            {
+                videoSource.SignalToStop();
+                videoSource.WaitForStop(); // 等待摄像头线程结束
+                videoSource.NewFrame -= video_NewFrame;
+
+                videoSource = null;
+            }
+
+            gpuSessionOptions?.Dispose();
+            session?.Dispose();
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            // 创建InferenceSession
+            int gpuDeviceId = 0;
+            gpuSessionOptions = SessionOptions.MakeSessionOptionWithCudaProvider(gpuDeviceId);
+            session = new InferenceSession(_modelPath);
+
+            var inputMeta = session.InputMetadata;
+            var outputMeta = session.OutputMetadata;
+
+            inputName = inputMeta.First().Key;
+            outputName = outputMeta.First().Key;
+
+            // 获取输入张量尺寸
+            InputWidth = inputMeta.First().Value.Dimensions.ToArray()[2];
+            InputHeight = inputMeta.First().Value.Dimensions.ToArray()[3];
+
+            resizedBitmap = new Bitmap(InputWidth, InputHeight);
+
+            textBox1.AppendText($"模型已加载: " + _modelPath + "\r\n");
         }
     }
 }

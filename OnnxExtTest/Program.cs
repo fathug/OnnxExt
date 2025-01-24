@@ -18,7 +18,7 @@ namespace OnnxExtTest
             // 文件路径
             string modelPath = Path.Combine(ConfigDirectory, "model", "best0116bs200.onnx");
 
-            string imageDirectory = Path.Combine(ConfigDirectory, "image3");
+            string imageDirectory = Path.Combine(ConfigDirectory, "image2");
             // 获取图片文件夹下的所有图片文件路径
             List<string> imagePaths = Directory.GetFiles(imageDirectory, "*.*", SearchOption.TopDirectoryOnly)
                                              .Where(s => s.EndsWith(".png"))
