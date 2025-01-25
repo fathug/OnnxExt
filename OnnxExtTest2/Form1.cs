@@ -12,6 +12,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -79,32 +80,19 @@ namespace OnnxExtTest2
 
         private async void button2_Click(object sender, EventArgs e)
         {
-            /*
             try
             {
                 // 加载图片并更新 UI（主线程操作）
                 Bitmap image0 = new Bitmap(_imagePath);
+
+                Bitmap image0Copy = new Bitmap(image0);
+
                 pictureBox1.Image = image0;
 
                 // 整个推理过程使用异步方法
                 List<ObjectResult> result = await Task.Run(() =>
                 {
-                    int gpuDeviceId = 0;
-                    using var gpuSessionOptions = SessionOptions.MakeSessionOptionWithCudaProvider(gpuDeviceId);
-
-                    // 创建InferenceSession
-                    using var session = new InferenceSession(_modelPath);
-                    var inputMeta = session.InputMetadata;
-                    var outputMeta = session.OutputMetadata;
-
-                    string inputName = inputMeta.First().Key;
-
-                    // 获取输入张量尺寸
-                    InputWidth = inputMeta.First().Value.Dimensions.ToArray()[2];
-                    InputHeight = inputMeta.First().Value.Dimensions.ToArray()[3];
-
-                    // 预处理
-                    DenseTensor<float> inputTensor = PreprocessImage(image0);
+                    DenseTensor<float> inputTensor = PreprocessImage(image0Copy);
                     var inputs = new List<NamedOnnxValue>()
                     {
                         NamedOnnxValue.CreateFromTensor(inputName, inputTensor)
@@ -112,19 +100,18 @@ namespace OnnxExtTest2
 
                     // 推理
                     using var results = session.Run(inputs);
-                    string outputName = outputMeta.First().Key;
                     var outputTensor = results.FirstOrDefault(r => r.Name == outputName)?.Value as DenseTensor<float>;
 
                     if (outputTensor == null)
                         throw new Exception("推理结果为空");
 
                     // 后处理
-                    List<ObjectResult> objectResults = ProcessOutput(outputTensor, _imagePath);
+                    List<ObjectResult> objectResults = ProcessOutput(outputTensor);
                     List<ObjectResult> objectResultsNms0 = NonMaxSuppression(objectResults, Nms);
                     return objectResultsNms0;
                 });
 
-                var image1 = DrawBoundingBoxes(result, image0);
+                var image1 = DrawBoundingBoxes(result, image0Copy);
 
                 // 创建副本用于显示，否则会报错资源占用
                 Bitmap image1Copy = new Bitmap(image1);
@@ -146,7 +133,6 @@ namespace OnnxExtTest2
             {
                 MessageBox.Show($"错误:{ex.Message}");
             }
-            */
         }
 
         // 图像转张量
@@ -484,17 +470,17 @@ namespace OnnxExtTest2
         // 摄像头每一帧图像回调
         private async void video_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
-            if (this.IsDisposed || pictureBox1.IsDisposed || pictureBox2.IsDisposed || textBox1.IsDisposed)
+            if (this.IsDisposed || videoSource == null)
             {
-                return; // 窗体或控件已释放，直接返回
+                return; // 如果资源已释放，直接返回
             }
 
             try
             {
+                stopwatch.Restart();
+
                 // 将摄像头图像显示到 pictureBoxCam
                 Bitmap image0 = (Bitmap)eventArgs.Frame.Clone();
-
-                stopwatch.Restart();
 
                 Bitmap image0Copy = new Bitmap(image0);
 
@@ -545,10 +531,9 @@ namespace OnnxExtTest2
         {
             if (videoSource != null && videoSource.IsRunning)
             {
-                videoSource.SignalToStop();
-                videoSource.WaitForStop(); // 等待摄像头线程结束
-                videoSource.NewFrame -= video_NewFrame;
-
+                videoSource.SignalToStop(); //发送停止信号
+                videoSource.WaitForStop();  //等待摄像头线程结束
+                videoSource.NewFrame -= video_NewFrame; //取消订阅,阻止在关闭期间处理新帧,不再有新的帧数据被处理
                 videoSource = null;
             }
 
@@ -576,6 +561,21 @@ namespace OnnxExtTest2
             resizedBitmap = new Bitmap(InputWidth, InputHeight);
 
             textBox1.AppendText($"模型已加载: " + _modelPath + "\r\n");
+        }
+
+        private void button6_Click(object sender, EventArgs e)
+        {
+            if (videoSource != null && videoSource.IsRunning)
+            {
+                videoSource.SignalToStop(); //发送停止信号
+                videoSource.WaitForStop();  //等待摄像头线程结束
+                videoSource.NewFrame -= video_NewFrame; //取消订阅,阻止在关闭期间处理新帧,不再有新的帧数据被处理
+                videoSource = null;
+            }
+
+            // 窗口未关闭的时候不能释放session
+            //gpuSessionOptions?.Dispose();
+            //session?.Dispose();
         }
     }
 }
