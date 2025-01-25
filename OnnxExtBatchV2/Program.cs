@@ -1,4 +1,12 @@
-﻿using Microsoft.ML.OnnxRuntime;
+﻿/// <summary>
+/// 批推理,batchsize>1
+/// </summary>
+/// <remarks>
+/// 2025-01-16 新建。推理方法的封装。
+/// 2025-01-16 优化。实现GPU加速。
+/// 2025-01-19 优化。自动获取模型输入输出参数。
+/// </remarks>
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System;
 using System.Collections.Generic;

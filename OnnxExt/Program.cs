@@ -1,4 +1,7 @@
-﻿using Microsoft.ML.OnnxRuntime;
+﻿/// <summary>
+/// 单张推理，输入为图像本地路径。
+/// </summary>
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System;
 using System.Collections.Generic;

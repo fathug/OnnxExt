@@ -1,4 +1,10 @@
-﻿using System;
+﻿/// <summary>
+/// 实现调用dll进行推理。
+/// </summary>
+/// <remarks>
+/// 2025-01-19 新建。
+/// </remarks>
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;

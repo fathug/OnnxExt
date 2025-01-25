@@ -1,4 +1,13 @@
-﻿using AForge.Video;
+﻿/// <summary>
+/// 实现推理结果的实时显示。
+/// 提供模型选择，视频流和图片推理功能。
+/// </summary>
+/// <remarks>
+/// 2025-01-23 新建。推理结果显示。
+/// 2025-01-23 新增。实现视频流推理。
+/// 2025-01-25 修复。推理过程中直接关闭form报异常：访问已释放资源，先停止推理再关闭无异常。
+/// </remarks>
+using AForge.Video;
 using AForge.Video.DirectShow;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;

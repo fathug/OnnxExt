@@ -1,4 +1,10 @@
-﻿using Microsoft.ML.OnnxRuntime;
+﻿/// <summary>
+/// 单张推理，输入为图像变量。
+/// </summary>
+/// <remarks>
+/// 2025-01-23 新建。PreprocessImage参数改为图像变量。
+/// </remarks>
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using System;
 using System.Collections.Generic;
