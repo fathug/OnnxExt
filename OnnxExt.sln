@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnnxExtV2", "OnnxExtV2\Onnx
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnnxExtTest2", "OnnxExtTest2\OnnxExtTest2.csproj", "{2B4AF677-2347-4B10-924B-60ABCFF452A8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnnxExtV2v8", "OnnxExtV2v8\OnnxExtV2v8.csproj", "{6A960A53-4B71-4861-A7BA-F9F7E3674D48}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -81,6 +83,14 @@ Global
 		{2B4AF677-2347-4B10-924B-60ABCFF452A8}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2B4AF677-2347-4B10-924B-60ABCFF452A8}.Release|x64.ActiveCfg = Release|Any CPU
 		{2B4AF677-2347-4B10-924B-60ABCFF452A8}.Release|x64.Build.0 = Release|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Debug|x64.Build.0 = Debug|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Release|x64.ActiveCfg = Release|Any CPU
+		{6A960A53-4B71-4861-A7BA-F9F7E3674D48}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
