@@ -521,7 +521,7 @@ namespace OnnxExtTest2
 
                 this.Invoke((MethodInvoker)(() =>
                 {
-                    textBox1.AppendText($"run cost {stopwatch.ElapsedMilliseconds}ms" + "\r\n");
+                    textBox1.AppendText($"Now:{System.DateTime.Now.ToString("yyyy-MM-dd,HH:mm:ss:fff")}, run cost: {stopwatch.ElapsedMilliseconds}ms" + "\r\n");
                 }));
 
                 var image1 = DrawBoundingBoxes(objectResultsNms, image0);
